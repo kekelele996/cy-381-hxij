@@ -11,8 +11,10 @@ const (
 	MsgGroupCreated        = "群组创建成功"
 	MsgMemberInvited       = "成员邀请成功"
 	MsgExpenseCreated      = "消费记录创建成功"
-	MsgSettlementGenerated = "结算建议生成成功"
-	MsgSettlementSettled   = "结算完成"
+	MsgSettlementGenerated   = "结算建议生成成功"
+	MsgSettlementTransferred = "已标记为我已转账，等待收款方确认"
+	MsgSettlementConfirmed   = "收款确认成功，双方净余额已更新"
+	MsgSettlementSettled     = "结算完成"
 	MsgExportStarted       = "导出成功"
 
 	MsgErrBind           = "请求体解析失败，请检查字段格式"
@@ -28,5 +30,7 @@ const (
 	MsgErrNotGroupMember = "您不是该群组成员，无法操作"
 	MsgErrExpenseInvalid = "分摊参数无效，请检查参与人与分摊配置"
 	MsgErrShareMismatch  = "分摊金额合计与消费总额不一致"
+	MsgErrSettlementParty = "只有转账的付款方/收款方本人才能操作，不能代对方确认"
+	MsgErrSettlementState = "转账当前状态不允许该操作（可能已被确认或作废）"
 	MsgErrRateLimited    = "请求过于频繁，请稍后再试"
 )

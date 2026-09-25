@@ -62,17 +62,18 @@ CREATE TABLE IF NOT EXISTS expense_shares (
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (expense_id, user_id)
 );
--- 结算建议表
+-- 结算建议表（双方确认：pending 待付款 → transferred 待收款确认 → settled 已确认收款；账单变更后未完成的为 voided）
 CREATE TABLE IF NOT EXISTS settlements (
-    id           BIGSERIAL PRIMARY KEY,
-    group_id     BIGINT NOT NULL,
-    from_user_id BIGINT NOT NULL,
-    to_user_id   BIGINT NOT NULL,
-    amount       DOUBLE PRECISION NOT NULL,
-    status       VARCHAR(16) NOT NULL DEFAULT 'pending',
-    settled_at   TIMESTAMPTZ,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    id             BIGSERIAL PRIMARY KEY,
+    group_id       BIGINT NOT NULL,
+    from_user_id   BIGINT NOT NULL,
+    to_user_id     BIGINT NOT NULL,
+    amount         DOUBLE PRECISION NOT NULL,
+    status         VARCHAR(16) NOT NULL DEFAULT 'pending',
+    transferred_at TIMESTAMPTZ,
+    settled_at     TIMESTAMPTZ,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 -- 审计日志表
 CREATE TABLE IF NOT EXISTS audit_logs (

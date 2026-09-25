@@ -89,9 +89,13 @@ func ExpenseStatusText(s string) string {
 func SettlementStatusText(s string) string {
 	switch constants.SettlementStatus(s) {
 	case constants.SettlementPending:
-		return "待结算"
+		return "待付款"
+	case constants.SettlementTransferred:
+		return "待收款确认"
 	case constants.SettlementSettled:
-		return "已结算"
+		return "已确认收款"
+	case constants.SettlementVoided:
+		return "已作废"
 	default:
 		return "未知"
 	}

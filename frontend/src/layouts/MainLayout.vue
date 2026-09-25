@@ -24,7 +24,7 @@
       <el-header class="main-layout__header">
         <div class="main-layout__header-left">
           <el-badge :value="pendingCount" :hidden="pendingCount === 0" :max="99">
-            <el-button text @click="goPending">待结算提醒</el-button>
+            <el-button text @click="goPending">待办转账</el-button>
           </el-badge>
         </div>
         <el-dropdown @command="handleCommand">

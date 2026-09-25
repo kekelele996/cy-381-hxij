@@ -142,34 +142,44 @@ paths:
         '200': { description: ok }
   /groups/{id}/settlements/generate:
     post:
-      summary: 生成智能结算建议
+      summary: 按最新账单重算结算转账（未确认的作废，已确认收款的保留）
       security: [ { bearerAuth: [] } ]
       responses:
         '200': { description: ok }
   /groups/{id}/settlements:
     get:
-      summary: 群组结算建议列表
+      summary: 群组结算转账列表（pending 待付款 / transferred 待收款确认 / settled 已确认 / voided 已作废）
       security: [ { bearerAuth: [] } ]
       responses:
         '200': { description: ok }
   /groups/{id}/balances:
     get:
-      summary: 群组成员净余额
+      summary: 群组成员净余额（仅已确认收款的转账计入，待确认金额不动）
       security: [ { bearerAuth: [] } ]
       responses:
         '200': { description: ok }
   /settlements/pending:
     get:
-      summary: 我的待结算提醒
+      summary: 等待当前用户操作的转账（待我转账 / 待我确认收款）
       security: [ { bearerAuth: [] } ]
       responses:
         '200': { description: ok }
-  /settlements/settle:
+  /settlements/transfer:
     post:
-      summary: 标记结算完成
+      summary: 付款方确认「我已转账」（仅 from_user 本人；金额进入待确认，净余额暂不动）
       security: [ { bearerAuth: [] } ]
       responses:
         '200': { description: ok }
+        '40303': { description: 非本笔转账付款方，无权代操作 }
+        '40905': { description: 转账当前状态不允许该操作 }
+  /settlements/confirm:
+    post:
+      summary: 收款方确认收款（仅 to_user 本人；确认后转账完成并更新双方净余额）
+      security: [ { bearerAuth: [] } ]
+      responses:
+        '200': { description: ok }
+        '40303': { description: 非本笔转账收款方，无权代确认 }
+        '40905': { description: 转账当前状态不允许该操作 }
   /groups/{id}/stats:
     get:
       summary: 群组数据统计（类别/月度/成员排行）

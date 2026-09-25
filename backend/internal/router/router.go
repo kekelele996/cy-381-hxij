@@ -38,8 +38,9 @@ func Setup(cfg *config.Config, db *gorm.DB, rdb *redis.Client, logger *slog.Logg
 	auditSvc := service.NewAuditService(auditRepo, logger)
 	userSvc := service.NewUserService(userRepo, jwtMgr, logger)
 	groupSvc := service.NewGroupService(db, groupRepo, memberRepo, userRepo, auditSvc, logger)
-	expenseSvc := service.NewExpenseService(db, expenseRepo, memberRepo, groupRepo, userRepo, auditSvc, logger)
 	settleSvc := service.NewSettlementService(db, settleRepo, shareRepo, memberRepo, groupRepo, userRepo, auditSvc, logger)
+	// 账单新增/修改/退款需在事务内触发结算建议作废重算，因此账单服务依赖结算服务。
+	expenseSvc := service.NewExpenseService(db, expenseRepo, memberRepo, groupRepo, userRepo, settleSvc, auditSvc, logger)
 	statsSvc := service.NewStatsService(statsRepo, shareRepo, memberRepo, logger)
 
 	userHandler := handler.NewUserHandler(userSvc)

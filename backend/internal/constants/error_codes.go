@@ -21,6 +21,8 @@ const (
 	CodeExpenseInvalidSplit  = 42201 // 分摊参数无效
 	CodeExpenseShareMismatch = 42202 // 分摊金额与消费总额不匹配
 	CodeSettlementInvalid    = 42203 // 结算建议无效
+	CodeSettlementWrongParty = 40303 // 非本笔转账的付款方/收款方，无权代对方确认
+	CodeSettlementWrongState = 40905 // 结算转账当前状态不允许该操作
 	CodeNotGroupMember       = 40302 // 非群组成员
 	CodeTokenExpired         = 40102 // 令牌过期
 )

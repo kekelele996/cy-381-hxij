@@ -36,19 +36,26 @@
       </el-col>
       <el-col :span="8">
         <el-card shadow="never">
-          <template #header><span>待结算提醒</span></template>
+          <template #header><span>待结算提醒（双方确认）</span></template>
           <div v-if="settlementStore.pending.length === 0" class="dashboard__ok">
             <el-icon color="#67c23a" :size="28"><CircleCheck /></el-icon>
-            <span>当前没有待结算项</span>
+            <span>当前没有需要你操作的转账</span>
           </div>
           <div v-for="item in settlementStore.pending" :key="item.id" class="dashboard__pending-item">
             <div class="dashboard__pending-main">
               <span class="dashboard__pending-amount"><MoneyText :value="item.amount" :tone="item.from_user_id === myId ? 'expense' : 'income'" /></span>
               <span class="dashboard__pending-desc">
-                {{ item.from_user_id === myId ? '你应转给' : item.to_name + ' 应转给你' }}
+                <template v-if="item.from_user_id === myId">
+                  你转给 {{ item.to_name || ('用户#' + item.to_user_id) }}，请在转账后点击「我已转账」
+                </template>
+                <template v-else>
+                  {{ item.from_name || ('用户#' + item.from_user_id) }} 已转给你，请确认收款
+                </template>
               </span>
             </div>
-            <el-button size="small" type="primary" text @click="goSettle(item.group_id)">去结算</el-button>
+            <el-button size="small" :type="item.from_user_id === myId ? 'warning' : 'success'" text @click="goSettle(item.group_id)">
+              {{ item.from_user_id === myId ? '去转账' : '去确认' }}
+            </el-button>
           </div>
         </el-card>
         <el-card shadow="never" style="margin-top: 16px">

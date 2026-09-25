@@ -25,7 +25,7 @@ docker compose up -d --build
 1. **创建分账群组**：创建群组、邀请好友、群组名称与描述编辑、归档。
 2. **添加消费记录**：金额、类别（餐饮/交通/住宿/娱乐/其他）、付款人、参与人、分摊方式、小票图片 URL。
 3. **多种分摊方式**：均摊 / 按比例 / 按金额，系统自动计算每人应付金额（合计严格等于消费总额）。
-4. **智能结算建议**：基于成员净余额贪心匹配最大债权人与债务人，最小化转账次数生成结算清单。
+4. **智能结算建议（双方确认）**：基于成员净余额贪心匹配最大债权人与债务人，最小化转账次数生成转账清单。每笔转账需**付款方先点「我已转账」**（金额进入待确认，净余额暂不动），**收款方核对是谁转来的钱后点「确认收款」**，转账才完成并更新双方净余额；服务端按 JWT 身份强制校验，任何一方都不能代对方确认。账单新增、修改或退款后，尚未完成双方确认的转账自动作废（voided）并按新账重算，已确认收款的记录保留。
 5. **账单历史查询**：按群组、时间范围、消费类别筛选，支持导出账单明细 CSV。
 6. **用户中心**：注册登录、头像昵称邮箱管理、我的群组列表、待结算提醒。
 7. **数据统计**：月度消费趋势、各类别占比、各成员消费排行（ECharts 图表）。
@@ -156,8 +156,22 @@ curl -sS -X POST http://localhost:19401/api/v1/groups/1/expenses \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"title":"火锅","amount":300,"category":"dining","payer_id":1,"split_type":"equal","paid_at":"2026-08-01 12:00:00","shares":[{"user_id":1},{"user_id":2},{"user_id":3}]}'
 
-# 6. 生成智能结算建议
+# 6. 按最新账单重算结算转账（新增账单后通常已自动重算，本接口用于手动触发）
 curl -sS -X POST http://localhost:19401/api/v1/groups/1/settlements/generate \
+  -H "Authorization: Bearer $TOKEN"
+
+# 6.1 付款方（from_user 本人）确认「我已转账」，金额进入待确认，净余额暂不动
+curl -sS -X POST http://localhost:19401/api/v1/settlements/transfer \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"settlement_id":10}'
+
+# 6.2 收款方（to_user 本人）确认收款，完成后双方净余额更新；其他人调用返回 40303
+curl -sS -X POST http://localhost:19401/api/v1/settlements/confirm \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"settlement_id":10}'
+
+# 6.3 查询等待当前用户操作的转账（待我转账 / 待我确认收款）
+curl -sS http://localhost:19401/api/v1/settlements/pending \
   -H "Authorization: Bearer $TOKEN"
 
 # 7. 查询群组统计
@@ -185,11 +199,13 @@ curl -sS http://localhost:19401/api/v1/audit-logs \
 
 ## 核心实体与接口复用
 
-核心实体（≥4）：**用户 User**、**分账群组 Group**、**消费记录 Expense**、**结算建议 Settlement**、**审计日志 AuditLog**（辅助实体：群组成员 GroupMember、分摊明细 ExpenseShare）。
+核心实体（≥4）：**用户 User**、**分账群组 Group**、**消费记录 Expense**、**结算转账 Settlement**（双方确认状态机）、**审计日志 AuditLog**（辅助实体：群组成员 GroupMember、分摊明细 ExpenseShare）。
 
 接口复用说明：
 - `GET /groups/:id/expenses` 与 `GET /groups/:id/expenses/export` 复用 `ExpenseService.List`（导出在 List 基础上转换 CSV）。
-- `GET /groups/:id/settlements`、`GET /groups/:id/balances` 与 `GET /settlements/pending` 复用成员校验 + 余额计算逻辑（`memberRepo.Exists` + `shareRepo.SumPaidByGroup/SumOwedByGroup`）。
+- 账单新增/修改/退款（`ExpenseService.Create/Update/Delete`）与 `POST /groups/:id/settlements/generate` 复用 `SettlementService.RebuildOnExpenseChange/rebuildInTx`：同一事务内「作废未确认转账 → 扣除已确认收款 → 重算剩余转账」。
+- `GET /groups/:id/settlements`、`GET /groups/:id/balances` 与 `GET /settlements/pending` 复用成员校验逻辑（`memberRepo.Exists`）；余额计算同时复用 `shareRepo.SumPaidByGroup/SumOwedByGroup` 与 `settleRepo.SumSettledByGroup`（仅已确认收款的转账计入净余额）。
+- `POST /settlements/transfer` 与 `POST /settlements/confirm` 复用同一「行锁 + 当事人校验 + 条件状态更新」流程，分别限定 `from_user` / `to_user` 本人操作。
 - `GET /groups/:id/stats` 与 `GET /groups/:id/balances` 复用 `ExpenseShareRepository.SumPaidByGroup/SumOwedByGroup`。
 
 ## 横切关注点
@@ -273,21 +289,29 @@ curl -sS http://localhost:19401/api/v1/audit-logs \
 - `src/pages/expense/ExpenseList.vue`：分摊方式标签
 - `src/utils/format.ts`：`splitTypeText`
 
-### 4. 结算状态 SettlementStatus（pending / settled）
+### 4. 结算状态 SettlementStatus（pending 待付款 / transferred 待收款确认 / settled 已确认收款 / voided 已作废）
+
+状态机：`pending`（付款方点「我已转账」）→ `transferred`（收款方点「确认收款」）→ `settled`；账单新增/修改/退款时，`pending`、`transferred` 统一变为 `voided` 并按新账重算，`settled` 永久保留。
 
 后端出现位置：
-- `internal/constants/enums.go`：定义枚举与 `IsValidSettlementStatus`
-- `internal/model/settlement.go`：`Settlement.Status` 字段、`IsPending`
-- `internal/dto/settlement_dto.go`：`SettlementResp.Status`
-- `internal/service/settlement_service.go`：生成时 `pending`、`Settle` 状态流转
-- `internal/repository/settlement_repository.go`：`ListPendingByUser` / `MarkSettled` 状态筛选
-- `internal/util/formatters.go`：`SettlementStatusText`
-- `internal/constants/log_templates.go`：`LogSettlementGenerated` / `LogSettlementSettled`
+- `internal/constants/enums.go`：定义四个枚举值、`IsValidSettlementStatus`、审计动作 `ActionSettlementTransfer/Confirm/VoidRebuild`
+- `internal/model/settlement.go`：`Settlement.Status/TransferredAt/SettledAt` 字段、`IsPending/IsTransferred/IsSettled/IsVoid/AwaitingAction`
+- `internal/dto/settlement_dto.go`：`SettlementResp.Status/AwaitingUserID/TransferredAt`、`SettlementActionReq`
+- `internal/service/settlement_service.go`：`MarkTransferred`（pending→transferred，限付款方）、`ConfirmReceived`（transferred→settled，限收款方）、`rebuildInTx`（作废重算）、`Balances`（扣除已确认收款）
+- `internal/service/expense_service.go`：Create/Update/Delete 事务内调用 `RebuildOnExpenseChange`
+- `internal/repository/settlement_repository.go`：`MarkTransferred/MarkSettled/VoidUnsettledByGroup/SumSettledByGroupOn/ListPendingByUser/FindByIDForUpdate` 状态筛选与行锁
+- `internal/util/formatters.go`：`SettlementStatusText`（待付款/待收款确认/已确认收款/已作废）
+- `internal/constants/log_templates.go`：`LogSettlementTransferred/LogSettlementConfirmed/LogSettlementVoidRebuild`
+- `internal/constants/error_codes.go`：`CodeSettlementWrongParty`（禁止代确认）/ `CodeSettlementWrongState`
+- `internal/handler/settlement_handler.go`、`internal/router/settlement.go`：`POST /settlements/transfer`、`POST /settlements/confirm`
 
 前端出现位置：
-- `src/constants/index.ts`：`SettlementStatus` / `SettlementStatusOptions`
-- `src/components/StatusBadge.vue`：结算状态徽标
-- `src/pages/settlement/SettlementList.vue`：状态展示与「标记已结算」按钮显隐
+- `src/constants/index.ts`：`SettlementStatus` 四值与 `SettlementStatusOptions`
+- `src/components/StatusBadge.vue`：结算状态徽标颜色（warning/primary/success/info）
+- `src/pages/settlement/SettlementList.vue`：状态、待谁操作、操作时间展示；「我已转账」仅付款方可见、「确认收款」仅收款方可见
+- `src/pages/Dashboard.vue`、`src/layouts/MainLayout.vue`：待我转账 / 待我确认提醒与角标
+- `src/api/settlement.ts`、`src/stores/settlement.ts`：`markTransferred` / `confirmReceived`
+- `src/pages/audit/AuditLogs.vue`：结算审计动作筛选项
 - `src/utils/format.ts`：`settlementStatusText`
 
 ### 5. 群组状态 GroupStatus（active / archived）
@@ -313,7 +337,7 @@ cd backend
 go test ./...
 ```
 
-覆盖：分摊算法（`pkg/splitcalc/split_test.go`，表驱动）、用户仓储 CRUD、群组仓储、消费仓储（表驱动）、用户服务注册/登录（表驱动）、消费服务分摊/退款、结算服务生成与结算。
+覆盖：分摊算法（`pkg/splitcalc/split_test.go`，表驱动）、用户仓储 CRUD、群组仓储、消费仓储（表驱动）、用户服务注册/登录（表驱动）、消费服务分摊/退款、结算双方确认流程（付款方转账/收款方确认/禁止代确认/净余额更新）与账单变更后未确认转账作废重算、已确认记录保留。
 
 ## License
 

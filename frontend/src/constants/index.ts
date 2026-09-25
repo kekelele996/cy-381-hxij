@@ -29,8 +29,10 @@ export const ExpenseStatus = {
 } as const
 
 export const SettlementStatus = {
-  PENDING: 'pending',
-  SETTLED: 'settled',
+  PENDING: 'pending', // 待付款：等待付款方点击「我已转账」
+  TRANSFERRED: 'transferred', // 待收款确认：付款方已转账，等待收款方确认
+  SETTLED: 'settled', // 已确认收款：双方净余额已更新
+  VOIDED: 'voided', // 已作废：账单变更后未完成双方确认
 } as const
 
 export const ShareStatus = {
@@ -53,8 +55,10 @@ export const SplitTypeOptions = [
 ]
 
 export const SettlementStatusOptions = [
-  { value: SettlementStatus.PENDING, label: '待结算' },
-  { value: SettlementStatus.SETTLED, label: '已结算' },
+  { value: SettlementStatus.PENDING, label: '待付款' },
+  { value: SettlementStatus.TRANSFERRED, label: '待收款确认' },
+  { value: SettlementStatus.SETTLED, label: '已确认收款' },
+  { value: SettlementStatus.VOIDED, label: '已作废' },
 ]
 
 export const GroupStatusOptions = [

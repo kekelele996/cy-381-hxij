@@ -49,8 +49,10 @@ const (
 type SettlementStatus string
 
 const (
-	SettlementPending SettlementStatus = "pending" // 待结算
-	SettlementSettled SettlementStatus = "settled" // 已结算
+	SettlementPending     SettlementStatus = "pending"     // 待付款：等待付款方点击「我已转账」
+	SettlementTransferred SettlementStatus = "transferred" // 待确认：付款方已转账，等待收款方确认
+	SettlementSettled     SettlementStatus = "settled"     // 已完成：收款方已确认收款，净余额已更新
+	SettlementVoided      SettlementStatus = "voided"      // 已作废：账单变更后未完成双方确认，按新账重算
 )
 
 // AuditAction 审计动作枚举
@@ -69,8 +71,10 @@ const (
 	ActionExpenseUpdate      AuditAction = "expense.update"
 	ActionExpenseDelete      AuditAction = "expense.delete"
 	ActionExpenseExport      AuditAction = "expense.export"
-	ActionSettlementGenerate AuditAction = "settlement.generate"
-	ActionSettlementSettle   AuditAction = "settlement.settle"
+	ActionSettlementGenerate    AuditAction = "settlement.generate"
+	ActionSettlementTransfer    AuditAction = "settlement.transfer"
+	ActionSettlementConfirm     AuditAction = "settlement.confirm"
+	ActionSettlementVoidRebuild AuditAction = "settlement.void_rebuild"
 	ActionUserUpdate         AuditAction = "user.update"
 	ActionUserRole           AuditAction = "user.role"
 )
@@ -110,5 +114,9 @@ func IsValidExpenseStatus(s string) bool {
 
 // IsValidSettlementStatus 校验结算状态
 func IsValidSettlementStatus(s string) bool {
-	return SettlementStatus(s) == SettlementPending || SettlementStatus(s) == SettlementSettled
+	switch SettlementStatus(s) {
+	case SettlementPending, SettlementTransferred, SettlementSettled, SettlementVoided:
+		return true
+	}
+	return false
 }

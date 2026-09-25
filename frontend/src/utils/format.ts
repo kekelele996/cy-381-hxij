@@ -61,8 +61,10 @@ export function expenseStatusText(value: string): string {
 
 export function settlementStatusText(value: string): string {
   const map: Record<string, string> = {
-    [SettlementStatus.PENDING]: '待结算',
-    [SettlementStatus.SETTLED]: '已结算',
+    [SettlementStatus.PENDING]: '待付款',
+    [SettlementStatus.TRANSFERRED]: '待收款确认',
+    [SettlementStatus.SETTLED]: '已确认收款',
+    [SettlementStatus.VOIDED]: '已作废',
   }
   return map[value] || value
 }

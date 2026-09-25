@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/aasplit/aasplit/internal/constants"
 	"github.com/aasplit/aasplit/internal/dto"
 	"github.com/aasplit/aasplit/internal/model"
 	"github.com/aasplit/aasplit/internal/service"
@@ -62,19 +63,34 @@ func (h *SettlementHandler) ListPending(c *gin.Context) {
 	util.OK(c, gin.H{"list": list, "total": len(list)})
 }
 
-// Settle 标记结算完成。
-func (h *SettlementHandler) Settle(c *gin.Context) {
-	var req dto.SettleReq
+// MarkTransferred 付款方确认「我已转账」，金额进入待确认，净余额暂不变化。
+func (h *SettlementHandler) MarkTransferred(c *gin.Context) {
+	var req dto.SettlementActionReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		util.Fail(c, util.Wrap(util.ValidationCode(err), util.ValidationMessage(err), err))
 		return
 	}
-	affected, err := h.settleSvc.Settle(util.GetUserID(c), &req)
+	item, err := h.settleSvc.MarkTransferred(util.GetUserID(c), &req)
 	if err != nil {
 		util.Fail(c, err)
 		return
 	}
-	util.OK(c, gin.H{"message": "结算完成", "affected": affected})
+	util.OK(c, gin.H{"message": constants.MsgSettlementTransferred, "settlement": toSettlementResp(item)})
+}
+
+// ConfirmReceived 收款方确认收款，转账完成并更新双方净余额。
+func (h *SettlementHandler) ConfirmReceived(c *gin.Context) {
+	var req dto.SettlementActionReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		util.Fail(c, util.Wrap(util.ValidationCode(err), util.ValidationMessage(err), err))
+		return
+	}
+	item, err := h.settleSvc.ConfirmReceived(util.GetUserID(c), &req)
+	if err != nil {
+		util.Fail(c, err)
+		return
+	}
+	util.OK(c, gin.H{"message": constants.MsgSettlementConfirmed, "settlement": toSettlementResp(item)})
 }
 
 // Balances 群组成员净余额。
@@ -98,15 +114,19 @@ func toSettlementResp(s *model.Settlement) *dto.SettlementResp {
 		toName = s.ToUser.Nickname
 	}
 	resp := &dto.SettlementResp{
-		ID:         s.ID,
-		GroupID:    s.GroupID,
-		FromUserID: s.FromUserID,
-		FromName:   fromName,
-		ToUserID:   s.ToUserID,
-		ToName:     toName,
-		Amount:     util.Round2(s.Amount),
-		Status:     string(s.Status),
-		CreatedAt:  util.FormatDateTime(s.CreatedAt),
+		ID:             s.ID,
+		GroupID:        s.GroupID,
+		FromUserID:     s.FromUserID,
+		FromName:       fromName,
+		ToUserID:       s.ToUserID,
+		ToName:         toName,
+		Amount:         util.Round2(s.Amount),
+		Status:         string(s.Status),
+		AwaitingUserID: s.AwaitingAction(),
+		CreatedAt:      util.FormatDateTime(s.CreatedAt),
+	}
+	if s.TransferredAt != nil {
+		resp.TransferredAt = util.FormatDateTime(*s.TransferredAt)
 	}
 	if s.SettledAt != nil {
 		resp.SettledAt = util.FormatDateTime(*s.SettledAt)

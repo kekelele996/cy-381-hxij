@@ -44,7 +44,9 @@ const actionOptions = [
   { value: 'expense.update', label: '更新消费' },
   { value: 'expense.delete', label: '退款消费' },
   { value: 'settlement.generate', label: '生成结算' },
-  { value: 'settlement.settle', label: '完成结算' },
+  { value: 'settlement.transfer', label: '标记已转账' },
+  { value: 'settlement.confirm', label: '确认收款' },
+  { value: 'settlement.void_rebuild', label: '账单变更重算结算' },
 ]
 
 onMounted(() => loadLogs())

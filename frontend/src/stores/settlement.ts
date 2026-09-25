@@ -1,11 +1,12 @@
-// 结算建议状态管理
+// 结算转账状态管理（双方确认）
 import { defineStore } from 'pinia'
 import {
+  confirmReceivedApi,
   generateSettlementsApi,
   listBalancesApi,
   listPendingSettlementsApi,
   listSettlementsApi,
-  settleApi,
+  markTransferredApi,
   type GroupBalance,
   type SettlementInfo,
 } from '@/api/settlement'
@@ -13,7 +14,7 @@ import {
 export const useSettlementStore = defineStore('settlement', {
   state: () => ({
     settlements: [] as SettlementInfo[],
-    pending: [] as SettlementInfo[],
+    pending: [] as SettlementInfo[], // 等待当前用户操作的转账
     balances: [] as GroupBalance[],
   }),
   actions: {
@@ -29,8 +30,14 @@ export const useSettlementStore = defineStore('settlement', {
       const data = await listPendingSettlementsApi()
       this.pending = data.list
     },
-    async settle(ids: number[]) {
-      await settleApi(ids)
+    // 付款方：我已转账
+    async markTransferred(id: number) {
+      await markTransferredApi(id)
+      await this.fetchPending()
+    },
+    // 收款方：确认收款
+    async confirmReceived(id: number) {
+      await confirmReceivedApi(id)
       await this.fetchPending()
     },
     async fetchBalances(groupId: number) {
