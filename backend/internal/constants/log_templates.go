@@ -26,6 +26,8 @@ const (
 	LogExpenseDeleted      = "expense deleted: expense_id=%d group_id=%d operator_id=%d"
 	LogExpenseExported     = "expense exported: group_id=%d rows=%d operator_id=%d"
 	LogSettlementGenerated = "settlement generated: group_id=%d transfers=%d operator_id=%d"
-	LogSettlementSettled   = "settlement settled: settlement_id=%d from_user_id=%d to_user_id=%d amount=%.2f operator_id=%d"
+	LogSettlementPaid      = "settlement paid: settlement_id=%d from_user_id=%d to_user_id=%d amount=%.2f operator_id=%d"
+	LogSettlementConfirmed = "settlement confirmed: settlement_id=%d from_user_id=%d to_user_id=%d amount=%.2f operator_id=%d"
+	LogSettlementVoided    = "settlement voided: group_id=%d voided=%d operator_id=%d"
 	LogAuditRecorded       = "audit recorded: user_id=%d action=%s resource_type=%s resource_id=%s request_id=%s"
 )

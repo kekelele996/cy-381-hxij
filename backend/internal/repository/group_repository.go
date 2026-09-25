@@ -59,8 +59,18 @@ func (r *GroupRepository) UpdateFields(id uint, fields map[string]interface{}) e
 
 // LockByID 行级锁查询群组（并发写场景 SELECT ... FOR UPDATE）。
 func (r *GroupRepository) LockByID(id uint) (*model.Group, error) {
+	return lockGroupByID(r.db, id)
+}
+
+// LockByIDTx 在事务内行级锁查询群组（锁随事务提交才释放，用于串行化群组内并发写）。
+func (r *GroupRepository) LockByIDTx(tx *gorm.DB, id uint) (*model.Group, error) {
+	return lockGroupByID(tx, id)
+}
+
+// lockGroupByID 在指定句柄上行级锁查询群组。
+func lockGroupByID(db *gorm.DB, id uint) (*model.Group, error) {
 	var g model.Group
-	if err := r.db.Clauses(lockClause).First(&g, id).Error; err != nil {
+	if err := db.Clauses(lockClause).First(&g, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrGroupNotFound
 		}

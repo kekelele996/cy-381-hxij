@@ -30,7 +30,9 @@ export const ExpenseStatus = {
 
 export const SettlementStatus = {
   PENDING: 'pending',
+  PAID: 'paid',
   SETTLED: 'settled',
+  VOIDED: 'voided',
 } as const
 
 export const ShareStatus = {
@@ -53,8 +55,10 @@ export const SplitTypeOptions = [
 ]
 
 export const SettlementStatusOptions = [
-  { value: SettlementStatus.PENDING, label: '待结算' },
-  { value: SettlementStatus.SETTLED, label: '已结算' },
+  { value: SettlementStatus.PENDING, label: '待转账' },
+  { value: SettlementStatus.PAID, label: '待收款确认' },
+  { value: SettlementStatus.SETTLED, label: '已完成' },
+  { value: SettlementStatus.VOIDED, label: '已作废' },
 ]
 
 export const GroupStatusOptions = [

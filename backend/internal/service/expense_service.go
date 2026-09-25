@@ -25,20 +25,21 @@ type ExpenseService struct {
 	memberRepo  *repository.GroupMemberRepository
 	groupRepo   *repository.GroupRepository
 	userRepo    *repository.UserRepository
+	settleSvc   *SettlementService
 	auditSvc    *AuditService
 	logger      *slog.Logger
 }
 
 // NewExpenseService 构造消费记录服务。
-func NewExpenseService(db *gorm.DB, expenseRepo *repository.ExpenseRepository, memberRepo *repository.GroupMemberRepository, groupRepo *repository.GroupRepository, userRepo *repository.UserRepository, auditSvc *AuditService, logger *slog.Logger) *ExpenseService {
-	return &ExpenseService{db: db, expenseRepo: expenseRepo, memberRepo: memberRepo, groupRepo: groupRepo, userRepo: userRepo, auditSvc: auditSvc, logger: logger}
+func NewExpenseService(db *gorm.DB, expenseRepo *repository.ExpenseRepository, memberRepo *repository.GroupMemberRepository, groupRepo *repository.GroupRepository, userRepo *repository.UserRepository, settleSvc *SettlementService, auditSvc *AuditService, logger *slog.Logger) *ExpenseService {
+	return &ExpenseService{db: db, expenseRepo: expenseRepo, memberRepo: memberRepo, groupRepo: groupRepo, userRepo: userRepo, settleSvc: settleSvc, auditSvc: auditSvc, logger: logger}
 }
 
 // Create 创建消费记录并计算分摊明细（事务 + 群组行锁）。
 func (s *ExpenseService) Create(userID uint, req *dto.CreateExpenseReq) (*model.Expense, error) {
 	var created *model.Expense
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		group, err := s.groupRepo.LockByID(req.GroupID)
+		group, err := s.groupRepo.LockByIDTx(tx, req.GroupID)
 		if err != nil {
 			return err
 		}
@@ -87,6 +88,10 @@ func (s *ExpenseService) Create(userID uint, req *dto.CreateExpenseReq) (*model.
 		if err := s.expenseRepo.CreateShares(tx, shareModels); err != nil {
 			return err
 		}
+		// 账单新增后：作废未双方确认的转账并按新账重算（已确认收款的记录保留）
+		if err := s.settleSvc.RecalculateTx(tx, req.GroupID, userID); err != nil {
+			return err
+		}
 		created = expense
 		return nil
 	})
@@ -105,7 +110,7 @@ func (s *ExpenseService) Update(userID, expenseID uint, req *dto.UpdateExpenseRe
 		if err != nil {
 			return util.Wrap(constants.CodeNotFound, "消费记录 expense 不存在", err)
 		}
-		group, err := s.groupRepo.LockByID(expense.GroupID)
+		group, err := s.groupRepo.LockByIDTx(tx, expense.GroupID)
 		if err != nil {
 			return util.Wrap(constants.CodeNotFound, "群组 group 不存在", err)
 		}
@@ -155,6 +160,10 @@ func (s *ExpenseService) Update(userID, expenseID uint, req *dto.UpdateExpenseRe
 		if err := s.expenseRepo.CreateShares(tx, shareModels); err != nil {
 			return err
 		}
+		// 账单修改后：作废未双方确认的转账并按新账重算（已确认收款的记录保留）
+		if err := s.settleSvc.RecalculateTx(tx, expense.GroupID, userID); err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {
@@ -178,7 +187,15 @@ func (s *ExpenseService) Delete(userID, expenseID uint) error {
 		if expense.Status != constants.ExpenseActive {
 			return util.NewAppError(constants.CodeConflict, "消费记录 expense 已退款，无需重复操作", nil)
 		}
-		return s.expenseRepo.UpdateStatus(tx, expenseID, string(constants.ExpenseRefunded))
+		// 群组行锁：与新增/修改串行化，保证结算重算基于最新账单
+		if _, err := s.groupRepo.LockByIDTx(tx, expense.GroupID); err != nil {
+			return util.Wrap(constants.CodeNotFound, "群组 group 不存在", err)
+		}
+		if err := s.expenseRepo.UpdateStatus(tx, expenseID, string(constants.ExpenseRefunded)); err != nil {
+			return err
+		}
+		// 账单退款后：作废未双方确认的转账并按新账重算（已确认收款的记录保留）
+		return s.settleSvc.RecalculateTx(tx, expense.GroupID, userID)
 	})
 	if err != nil {
 		return err

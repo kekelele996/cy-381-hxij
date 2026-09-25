@@ -273,21 +273,25 @@ curl -sS http://localhost:19401/api/v1/audit-logs \
 - `src/pages/expense/ExpenseList.vue`：分摊方式标签
 - `src/utils/format.ts`：`splitTypeText`
 
-### 4. 结算状态 SettlementStatus（pending / settled）
+### 4. 结算状态 SettlementStatus（pending / paid / settled / voided）
+
+结算采用**双方确认**状态机：`pending`（待转账）→ 付款方点「我已转账」→ `paid`（待收款确认，净余额暂不变化）→ 收款方点「确认收款」→ `settled`（转账完成，更新双方净余额）。账单新增/修改/退款后，`pending`/`paid` 的转账自动作废为 `voided` 并按新账重算，`settled` 记录永久保留并抵减净余额。两个动作均校验操作人身份（付款方/收款方本人），任何人无法替对方确认。
 
 后端出现位置：
 - `internal/constants/enums.go`：定义枚举与 `IsValidSettlementStatus`
-- `internal/model/settlement.go`：`Settlement.Status` 字段、`IsPending`
-- `internal/dto/settlement_dto.go`：`SettlementResp.Status`
-- `internal/service/settlement_service.go`：生成时 `pending`、`Settle` 状态流转
-- `internal/repository/settlement_repository.go`：`ListPendingByUser` / `MarkSettled` 状态筛选
+- `internal/model/settlement.go`：`Settlement.Status` 字段、`IsPending/IsPaid/IsSettled`
+- `internal/dto/settlement_dto.go`：`SettlementResp.Status`、`SettlementActionReq`
+- `internal/service/settlement_service.go`：`Pay`（仅付款方）、`Confirm`（仅收款方）、`RecalculateTx`（账单变更重算）
+- `internal/service/expense_service.go`：账单新增/修改/退款后同事务调用 `RecalculateTx`
+- `internal/repository/settlement_repository.go`：`MarkPaid` / `MarkConfirmed` / `VoidUnconfirmedByGroup` / `SumSettledByGroup`
 - `internal/util/formatters.go`：`SettlementStatusText`
-- `internal/constants/log_templates.go`：`LogSettlementGenerated` / `LogSettlementSettled`
+- `internal/constants/log_templates.go`：`LogSettlementGenerated` / `LogSettlementPaid` / `LogSettlementConfirmed` / `LogSettlementVoided`
 
 前端出现位置：
 - `src/constants/index.ts`：`SettlementStatus` / `SettlementStatusOptions`
 - `src/components/StatusBadge.vue`：结算状态徽标
-- `src/pages/settlement/SettlementList.vue`：状态展示与「标记已结算」按钮显隐
+- `src/pages/settlement/SettlementList.vue`：状态展示、「待操作」列、「我已转账」/「确认收款」按钮按身份显隐
+- `src/pages/Dashboard.vue`：待结算提醒按状态提示待办方
 - `src/utils/format.ts`：`settlementStatusText`
 
 ### 5. 群组状态 GroupStatus（active / archived）

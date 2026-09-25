@@ -44,11 +44,13 @@
           <div v-for="item in settlementStore.pending" :key="item.id" class="dashboard__pending-item">
             <div class="dashboard__pending-main">
               <span class="dashboard__pending-amount"><MoneyText :value="item.amount" :tone="item.from_user_id === myId ? 'expense' : 'income'" /></span>
-              <span class="dashboard__pending-desc">
-                {{ item.from_user_id === myId ? '你应转给' : item.to_name + ' 应转给你' }}
+              <span class="dashboard__pending-desc" :class="{ 'dashboard__pending-desc--action': needMyAction(item) }">
+                {{ pendingDesc(item) }}
               </span>
             </div>
-            <el-button size="small" type="primary" text @click="goSettle(item.group_id)">去结算</el-button>
+            <el-button size="small" :type="needMyAction(item) ? 'primary' : 'info'" text @click="goSettle(item.group_id)">
+              {{ needMyAction(item) ? '去处理' : '查看进度' }}
+            </el-button>
           </div>
         </el-card>
         <el-card shadow="never" style="margin-top: 16px">
@@ -83,10 +85,11 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { CircleCheck } from '@element-plus/icons-vue'
-import { CategoryOptions } from '@/constants'
+import { CategoryOptions, SettlementStatus } from '@/constants'
 import { useGroupStore } from '@/stores/group'
 import { useSettlementStore } from '@/stores/settlement'
 import { useAuthStore } from '@/stores/auth'
+import type { SettlementInfo } from '@/api/settlement'
 import DataTable from '@/components/DataTable.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -117,6 +120,27 @@ function goGroup(id: number) {
 
 function goSettle(groupId: number) {
   router.push(`/groups/${groupId}/settlements`)
+}
+
+// 是否需要当前用户操作（待我转账 / 待我确认收款）
+function needMyAction(item: SettlementInfo): boolean {
+  return (
+    (item.status === SettlementStatus.PENDING && item.from_user_id === myId.value) ||
+    (item.status === SettlementStatus.PAID && item.to_user_id === myId.value)
+  )
+}
+
+// 待结算提醒文案：明确谁需要操作
+function pendingDesc(item: SettlementInfo): string {
+  const fromName = item.from_name || '对方'
+  const toName = item.to_name || '对方'
+  if (item.status === SettlementStatus.PENDING) {
+    return item.from_user_id === myId.value ? `你应转给 ${toName}（待你转账）` : `待 ${fromName} 转账给你`
+  }
+  if (item.status === SettlementStatus.PAID) {
+    return item.to_user_id === myId.value ? `${fromName} 已转账，待你确认收款` : `待 ${toName} 确认收款`
+  }
+  return ''
 }
 
 function quickAdd(category: string) {
@@ -176,6 +200,10 @@ async function handleCreate() {
 .dashboard__pending-desc {
   color: #909399;
   font-size: 12px;
+}
+.dashboard__pending-desc--action {
+  color: #e6a23c;
+  font-weight: 600;
 }
 .dashboard__quick {
   margin: 4px 8px 4px 0;

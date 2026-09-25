@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS expense_shares (
     UNIQUE (expense_id, user_id)
 );
 -- 结算建议表
+-- 状态机：pending(待转账) → paid(付款方已标记) → settled(收款方已确认)；账单变更时未确认记录作废为 voided
 CREATE TABLE IF NOT EXISTS settlements (
     id           BIGSERIAL PRIMARY KEY,
     group_id     BIGINT NOT NULL,
@@ -70,6 +71,7 @@ CREATE TABLE IF NOT EXISTS settlements (
     to_user_id   BIGINT NOT NULL,
     amount       DOUBLE PRECISION NOT NULL,
     status       VARCHAR(16) NOT NULL DEFAULT 'pending',
+    paid_at      TIMESTAMPTZ,
     settled_at   TIMESTAMPTZ,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()

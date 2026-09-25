@@ -47,7 +47,8 @@ func newExpenseServiceFixture(t *testing.T) (*gorm.DB, *ExpenseService, *GroupSe
 	if err := groupSvc.InviteMember(u1.ID, group.ID, "carol"); err != nil {
 		t.Fatalf("invite carol: %v", err)
 	}
-	expenseSvc := NewExpenseService(db, repository.NewExpenseRepository(db), memberRepo, groupRepo, userRepo, auditSvc, logger)
+	settleSvc := NewSettlementService(db, repository.NewSettlementRepository(db), repository.NewExpenseShareRepository(db), memberRepo, groupRepo, userRepo, auditSvc, logger)
+	expenseSvc := NewExpenseService(db, repository.NewExpenseRepository(db), memberRepo, groupRepo, userRepo, settleSvc, auditSvc, logger)
 	return db, expenseSvc, groupSvc, group.ID, u1.ID, u2.ID, u3.ID
 }
 

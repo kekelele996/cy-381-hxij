@@ -10,12 +10,13 @@ type SettlementResp struct {
 	ToName     string  `json:"to_name"`
 	Amount     float64 `json:"amount"`
 	Status     string  `json:"status"`
+	PaidAt     string  `json:"paid_at,omitempty"`
 	SettledAt  string  `json:"settled_at,omitempty"`
 	CreatedAt  string  `json:"created_at"`
 }
 
-// SettleReq 标记结算完成请求。
-type SettleReq struct {
+// SettlementActionReq 结算状态流转请求（标记转账 / 确认收款共用）。
+type SettlementActionReq struct {
 	SettlementIDs []uint `json:"settlement_ids" binding:"required,min=1,dive,gt=0"`
 }
 

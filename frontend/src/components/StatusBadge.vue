@@ -25,7 +25,13 @@ const tagType = computed<'primary' | 'success' | 'warning' | 'info' | 'danger'>(
     case 'group':
       return s === GroupStatus.ACTIVE ? 'success' : 'info'
     case 'settlement':
-      return s === SettlementStatus.PENDING ? 'warning' : 'success'
+      return s === SettlementStatus.PENDING
+        ? 'warning'
+        : s === SettlementStatus.PAID
+          ? 'primary'
+          : s === SettlementStatus.SETTLED
+            ? 'success'
+            : 'info'
     case 'expense':
       return s === ExpenseStatus.ACTIVE ? 'success' : 'danger'
     case 'split':

@@ -164,9 +164,15 @@ paths:
       security: [ { bearerAuth: [] } ]
       responses:
         '200': { description: ok }
-  /settlements/settle:
+  /settlements/pay:
     post:
-      summary: 标记结算完成
+      summary: 付款方标记"我已转账"（金额进入待确认，净余额暂不变化）
+      security: [ { bearerAuth: [] } ]
+      responses:
+        '200': { description: ok }
+  /settlements/confirm:
+    post:
+      summary: 收款方确认收款（转账完成，更新双方净余额）
       security: [ { bearerAuth: [] } ]
       responses:
         '200': { description: ok }

@@ -20,6 +20,7 @@ func RegisterSettlementRoutes(r *gin.RouterGroup, h *handler.SettlementHandler, 
 	settlements.Use(middleware.Auth(jwt))
 	{
 		settlements.GET("/pending", h.ListPending)
-		settlements.POST("/settle", h.Settle)
+		settlements.POST("/pay", h.Pay)
+		settlements.POST("/confirm", h.Confirm)
 	}
 }

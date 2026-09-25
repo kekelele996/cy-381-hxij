@@ -19,12 +19,22 @@ func NewExpenseShareRepository(db *gorm.DB) *ExpenseShareRepository {
 
 // SumPaidByGroup 统计群组内各成员付款总额（付款人维度）。
 func (r *ExpenseShareRepository) SumPaidByGroup(groupID uint) (map[uint]float64, error) {
+	return sumPaidByGroup(r.db, groupID)
+}
+
+// SumPaidByGroupTx 同 SumPaidByGroup，在事务内执行（可读到未提交变更）。
+func (r *ExpenseShareRepository) SumPaidByGroupTx(tx *gorm.DB, groupID uint) (map[uint]float64, error) {
+	return sumPaidByGroup(tx, groupID)
+}
+
+// sumPaidByGroup 在指定句柄上统计群组内各成员付款总额。
+func sumPaidByGroup(db *gorm.DB, groupID uint) (map[uint]float64, error) {
 	type row struct {
 		UserID uint
 		Total  float64
 	}
 	var rows []row
-	if err := r.db.Model(&model.Expense{}).
+	if err := db.Model(&model.Expense{}).
 		Select("payer_id AS user_id, SUM(amount) AS total").
 		Where("group_id = ? AND status = ?", groupID, "active").
 		Group("payer_id").Scan(&rows).Error; err != nil {
@@ -39,12 +49,22 @@ func (r *ExpenseShareRepository) SumPaidByGroup(groupID uint) (map[uint]float64,
 
 // SumOwedByGroup 统计群组内各成员应付总额（参与人维度，仅有效消费）。
 func (r *ExpenseShareRepository) SumOwedByGroup(groupID uint) (map[uint]float64, error) {
+	return sumOwedByGroup(r.db, groupID)
+}
+
+// SumOwedByGroupTx 同 SumOwedByGroup，在事务内执行（可读到未提交变更）。
+func (r *ExpenseShareRepository) SumOwedByGroupTx(tx *gorm.DB, groupID uint) (map[uint]float64, error) {
+	return sumOwedByGroup(tx, groupID)
+}
+
+// sumOwedByGroup 在指定句柄上统计群组内各成员应付总额。
+func sumOwedByGroup(db *gorm.DB, groupID uint) (map[uint]float64, error) {
 	type row struct {
 		UserID uint
 		Total  float64
 	}
 	var rows []row
-	if err := r.db.Table("expense_shares AS s").
+	if err := db.Table("expense_shares AS s").
 		Joins("JOIN expenses AS e ON e.id = s.expense_id").
 		Select("s.user_id AS user_id, SUM(s.share_amount) AS total").
 		Where("e.group_id = ? AND e.status = ? AND s.status = ?", groupID, "active", "unsettled").

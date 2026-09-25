@@ -10,6 +10,7 @@ export interface SettlementInfo {
   to_name: string
   amount: number
   status: string
+  paid_at?: string
   settled_at?: string
   created_at: string
 }
@@ -33,8 +34,14 @@ export function listPendingSettlementsApi() {
   return get<{ list: SettlementInfo[]; total: number }>('/settlements/pending')
 }
 
-export function settleApi(settlementIds: number[]) {
-  return post<{ message: string; affected: number }>('/settlements/settle', { settlement_ids: settlementIds })
+// 付款方标记"我已转账"（金额进入待确认，净余额暂不变化）
+export function paySettlementApi(settlementIds: number[]) {
+  return post<{ message: string; affected: number }>('/settlements/pay', { settlement_ids: settlementIds })
+}
+
+// 收款方确认收款（转账完成，更新双方净余额）
+export function confirmSettlementApi(settlementIds: number[]) {
+  return post<{ message: string; affected: number }>('/settlements/confirm', { settlement_ids: settlementIds })
 }
 
 export function listBalancesApi(groupId: number) {
